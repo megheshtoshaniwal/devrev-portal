@@ -1,0 +1,296 @@
+@import "tailwindcss";
+
+/* ─── Light Theme (default) ──────────────────────────────────────
+   All values are HSL components without the hsl() wrapper.
+   The ThemeProvider injects overrides via document.documentElement.style.
+   This means any org can override any color token at runtime. */
+
+:root {
+  --radius: 0.875rem;
+
+  /* Brand */
+  --primary: 18 100% 52%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Surfaces */
+  --background: 40 20% 97%;
+  --foreground: 240 6% 10%;
+  --muted: 40 12% 93%;
+  --muted-foreground: 240 4% 46%;
+  --border: 40 10% 88%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 10%;
+  --accent: 52 100% 63%;
+  --accent-foreground: 240 6% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+  --surface: 40 15% 95%;
+  --secondary: 40 12% 93%;
+  --secondary-foreground: 240 6% 10%;
+
+  /* Semantic */
+  --destructive: 0 84% 60%;
+  --success: 152 60% 42%;
+  --warning: 38 100% 55%;
+
+  /* Interactive */
+  --ring: 18 100% 52%;
+  --input: 40 10% 88%;
+}
+
+/* ─── Dark Theme ─────────────────────────────────────────────────
+   Applied when ThemeProvider adds .dark to <html>.
+   Orgs can override individual values; these are sensible dark defaults. */
+
+.dark {
+  --primary: 18 100% 60%;
+  --primary-foreground: 0 0% 100%;
+
+  --background: 240 6% 10%;
+  --foreground: 40 20% 95%;
+  --muted: 240 5% 18%;
+  --muted-foreground: 240 4% 60%;
+  --border: 240 5% 22%;
+  --card: 240 5% 14%;
+  --card-foreground: 40 20% 95%;
+  --accent: 52 80% 55%;
+  --accent-foreground: 240 6% 10%;
+  --popover: 240 5% 14%;
+  --popover-foreground: 40 20% 95%;
+  --surface: 240 5% 12%;
+  --secondary: 240 5% 18%;
+  --secondary-foreground: 40 20% 95%;
+
+  --destructive: 0 72% 65%;
+  --success: 152 50% 50%;
+  --warning: 38 90% 60%;
+
+  --ring: 18 100% 60%;
+  --input: 240 5% 22%;
+}
+
+/* ─── Tailwind Theme Mapping ─────────────────────────────────────
+   Maps CSS variables to Tailwind color utilities. */
+
+@theme inline {
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-ring: hsl(var(--ring));
+  --color-input: hsl(var(--input));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ─── Base Styles ────────────────────────────────────────────────*/
+
+body {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────*/
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.3); }
+  70% { box-shadow: 0 0 0 12px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float { animation: float 4s ease-in-out infinite; }
+.animate-pulse-ring { animation: pulse-ring 2s ease infinite; }
+.animate-slide-up { animation: slide-up 0.4s ease-out both; }
+
+/* ─── Reduced Motion ────────────────────────────────────────────
+   Disable non-essential animations for users with vestibular disorders. */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-pulse-ring,
+  .animate-slide-up {
+    animation: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Skip Link (keyboard navigation) ───────────────────────────*/
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.skip-link:focus {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* ─── Prose Overrides (for article content) ──────────────────────*/
+
+.prose img {
+  border-radius: var(--radius);
+  max-width: 100%;
+  height: auto;
+}
+
+.prose table {
+  font-size: 0.875rem;
+}
+
+.prose pre {
+  border-radius: var(--radius);
+  background: hsl(var(--muted));
+}
+
+.prose code {
+  background: hsl(var(--muted));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* ─── Tiptap Editor Styles ───────────────────────────────────────*/
+
+.tiptap {
+  outline: none;
+}
+
+.tiptap h1 { font-size: 1.75rem; font-weight: 700; margin: 1.5rem 0 0.75rem; }
+.tiptap h2 { font-size: 1.375rem; font-weight: 600; margin: 1.25rem 0 0.625rem; }
+.tiptap h3 { font-size: 1.125rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+
+.tiptap p { margin: 0.5rem 0; line-height: 1.7; }
+
+.tiptap ul, .tiptap ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+.tiptap li { margin: 0.25rem 0; }
+.tiptap ul { list-style-type: disc; }
+.tiptap ol { list-style-type: decimal; }
+
+.tiptap blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+.tiptap pre {
+  background: hsl(var(--muted));
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.tiptap code {
+  background: hsl(var(--muted));
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-family: var(--font-mono), monospace;
+}
+
+.tiptap pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.tiptap th, .tiptap td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.tiptap th {
+  background: hsl(var(--muted));
+  font-weight: 600;
+}
+
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  margin: 1rem 0;
+}
+
+.tiptap a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tiptap a:hover {
+  opacity: 0.8;
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.5rem 0;
+}
+
+.tiptap mark {
+  background-color: hsl(52 100% 80%);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.125rem;
+}
