@@ -43,7 +43,7 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
 
-  const res = await fetch(`${API_BASE}/${path}`, {
+const res = await fetch(`${API_BASE}/${path}`, {
     method: "POST",
     headers: {
       Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}`,

@@ -315,23 +315,12 @@ export default function CreateTicketPage() {
       // formFields is already filtered by ACL (visibility + write permission)
       const writableFieldNames = new Set(formFields.map((f) => f.name));
 
-      // DEBUG: log what we're working with
-      console.log("[ticket-create] entity keys:", Object.keys(entity));
-      console.log("[ticket-create] formField names:", [...writableFieldNames]);
-      console.log("[ticket-create] selectedSubtype:", selectedSubtype);
-
       const customFields: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(entity)) {
-        if (key !== "title" && key !== "body" && value !== undefined && value !== null && value !== "") {
-          if (writableFieldNames.has(key)) {
-            customFields[key] = value;
-          } else {
-            console.log("[ticket-create] DROPPED field (not in formFields):", key, "=", value);
-          }
+        if (key !== "title" && key !== "body" && value !== undefined && value !== null && value !== "" && writableFieldNames.has(key)) {
+          customFields[key] = value;
         }
       }
-
-      console.log("[ticket-create] final custom_fields:", customFields);
 
       const payload: Record<string, unknown> = {
         type: "ticket",
