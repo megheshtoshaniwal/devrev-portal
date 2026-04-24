@@ -69,7 +69,7 @@ src/
 
 ## Build Your Own Portal
 
-Keep the SDK, build your own UI. Use hooks to pull data:
+Keep the SDK, build your own UI. Use the hooks you need, ignore the rest.
 
 ```tsx
 import { useSession } from '@/devrev-sdk/hooks/use-session'
@@ -89,7 +89,66 @@ function MyHelpCenter() {
 }
 ```
 
-See `src/components/figma/` for a complete example — a Figma-style help center built entirely with SDK hooks.
+### Pick your features
+
+Every feature is a hook. Use what you want, skip what you don't — there's no config file, no feature flags. Your code is the config.
+
+| Feature | How to use it | How to skip it |
+|---------|--------------|----------------|
+| **Knowledge base** | `useDirectories()` + `useDirectoryArticles(id)` | Don't import it |
+| **Tickets** | `useTickets()` + `useTicketSchema()` | Don't build a tickets page |
+| **Conversations** | `useConversations()` | Don't build a conversations page |
+| **AI chat** | `apiCall("POST", "internal/recommendations.chat.completions", {...})` | Don't call the endpoint |
+| **AI personalization** | `assembleBlocks(signals, apiCall, config)` | Don't call it — build a static homepage |
+| **Ticket AI assist** | Call LLM with your prompt + form fields | Use a plain form instead |
+| **Ticket deflection** | Search KB before ticket creation | Skip straight to the form |
+| **Auth / SSO** | `useSession()` + `AuthAdapter` | Use `DevRevProvider` without an adapter (anonymous sessions) |
+| **Search** | `apiCall("POST", "internal/search.core", { query })` | Don't add a search bar |
+
+### Configure AI — in your code
+
+No admin UI needed. Your prompts, your config:
+
+```tsx
+import { assembleBlocks } from '@/devrev-sdk/personalization/engine'
+import { useDevRevAPI } from '@/devrev-sdk/hooks/use-devrev'
+
+function MyHomepage() {
+  const { apiCall } = useDevRevAPI()
+
+  // Personalization — your prompt, your rules
+  const page = await assembleBlocks(
+    { user, tickets, conversations, directories },
+    apiCall,
+    {
+      systemPrompt: "You are Acme's AI. Users are small business owners...",
+      contextSignals: ["user_identity", "tickets", "kb_directories"],
+      temperature: 0.3,
+      actionCardCount: 4,
+      suggestionCount: 3,
+    }
+  )
+  // page.greeting, page.actionCards, page.sidebarBlocks
+
+  // Direct AI chat — your prompt, your UI
+  const response = await apiCall(
+    "POST",
+    "internal/recommendations.chat.completions",
+    {
+      messages: [
+        { role: "system", content: "You help Acme users with billing questions..." },
+        { role: "user", content: "How do I update my payment method?" },
+      ],
+      temperature: 0.3,
+    }
+  )
+  // response.text_response → AI answer
+}
+```
+
+### Full example
+
+See `src/components/figma/` — a complete Figma-style help center built entirely with SDK hooks. It has a conversational AI bar, category grid, ticket list, and CTA sections — all using the same hooks documented here.
 
 ---
 
