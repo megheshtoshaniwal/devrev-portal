@@ -27,10 +27,12 @@ import {
 import { usePortalConfig } from "@/portal/config";
 import { useSession } from "@/devrev-sdk/hooks/use-session";
 import { useDevRevAPI } from "@/devrev-sdk/hooks/use-devrev";
+import { useAIContext } from "@/devrev-sdk/ai/use-ai-context";
+import { assembleBlocks, type PersonalizedPage } from "@/devrev-sdk/personalization/engine";
 import { useDirectories } from "@/devrev-sdk/data/use-directories";
 import { useTickets } from "@/devrev-sdk/data/use-tickets";
 import { useConversations } from "@/devrev-sdk/data/use-conversations";
-import type { DirectoryNode, Conversation } from "@/devrev-sdk/client";
+import type { DirectoryNode, Conversation, Article } from "@/devrev-sdk/client";
 import { formatRelativeTime } from "@/devrev-sdk/utils/format-date";
 
 // ── Icon + color pools for category cards ────────────────────
@@ -63,13 +65,61 @@ const CARD_COLORS = [
 
 export function FigmaHomepage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const personalizationAttempted = useRef(false);
   const { config, basePath } = usePortalConfig();
-  const { user, token } = useSession();
+  const { user, token, isAuthenticated, login } = useSession();
   const { apiCall } = useDevRevAPI();
+  const { contextPrefix } = useAIContext();
   const { directories, loading: dirLoading } = useDirectories();
   const { tickets, loading: ticketsLoading } = useTickets({ limit: 5 });
   const { conversations } = useConversations({ limit: 3 });
   const [query, setQuery] = useState("");
+
+  // ─── AI Personalization (SDK: assembleBlocks) ────────────
+  const [personalization, setPersonalization] = useState<PersonalizedPage | null>(null);
+  const dataReady = !dirLoading && !ticketsLoading;
+  useEffect(() => {
+    if (!dataReady || !token || personalizationAttempted.current) return;
+    personalizationAttempted.current = true;
+    assembleBlocks(
+      { user, tickets, conversations, directories },
+      apiCall,
+      {
+        systemPrompt: `You are Figma's help center AI. Given the user's context, personalize their homepage with relevant action cards and greeting. Return JSON.`,
+        contextSignals: ["user_identity", "tickets", "conversations", "kb_directories"],
+        temperature: 0.3,
+        maxTokens: 600,
+        actionCardCount: 4,
+        suggestionCount: 3,
+      }
+    ).then(setPersonalization).catch(() => {
+      personalizationAttempted.current = false;
+    });
+  }, [dataReady, token, user, tickets, conversations, directories, apiCall]);
+
+  // ─── Search state (SDK: searchCore) ──────────────────────
+  const [searchResults, setSearchResults] = useState<Article[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
+
+  const handleSearch = useCallback(async (q: string) => {
+    if (!q.trim() || !token) return;
+    setSearchActive(true);
+    setSearchLoading(true);
+    try {
+      const res = await apiCall<{ results: Array<{ article?: Article }> }>(
+        "POST", "internal/search.core",
+        { query: q, namespaces: ["article"], limit: 6 }
+      );
+      setSearchResults(
+        (res.results || []).filter((r) => r.article).map((r) => r.article as Article)
+      );
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [apiCall, token]);
 
   // ─── Conversation state ──────────────────────────────────
   const [conversationActive, setConversationActive] = useState(false);
@@ -207,15 +257,61 @@ export function FigmaHomepage() {
         )}
 
         <div className="mx-auto max-w-[700px] px-6 relative">
-          {/* Hero heading — hide when conversation is active */}
-          {!conversationActive && (
+          {/* Hero heading — personalized via assembleBlocks SDK */}
+          {!conversationActive && !searchActive && (
             <div className="pt-20 pb-6 text-center">
               <h1 className="text-[44px] font-bold text-black leading-[1.1] tracking-tight mb-4">
-                {config.content.welcomeHeadline}
+                {personalization?.greeting.headline || config.content.welcomeHeadline}
               </h1>
               <p className="text-[18px] text-[#545454] leading-relaxed">
-                {config.content.welcomeSubtext}
+                {personalization?.greeting.subtext || config.content.welcomeSubtext}
               </p>
+            </div>
+          )}
+
+          {/* Search results (SDK: searchCore) */}
+          {searchActive && !conversationActive && (
+            <div className="pt-8 pb-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[18px] font-semibold text-black">
+                  {searchLoading ? "Searching..." : `${searchResults.length} results`}
+                </h2>
+                <button
+                  onClick={() => { setSearchActive(false); setSearchResults([]); setQuery(""); }}
+                  className="text-[13px] text-[#5551FF] hover:underline cursor-pointer"
+                >
+                  Clear search
+                </button>
+              </div>
+              {searchLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-[#999] mx-auto" />
+              ) : searchResults.length > 0 ? (
+                <div className="space-y-2">
+                  {searchResults.map((article) => (
+                    <Link
+                      key={article.id}
+                      href={`${basePath}/articles/${article.display_id}`}
+                      className="group flex items-start gap-3 rounded-lg border border-[#e5e5e5] p-4 hover:border-[#5551FF]/30 transition-colors"
+                    >
+                      <BookOpen className="h-4 w-4 text-[#999] mt-0.5 shrink-0" />
+                      <div>
+                        <h3 className="text-[14px] font-medium text-black group-hover:text-[#5551FF] transition-colors">
+                          {article.title}
+                        </h3>
+                        {article.description && (
+                          <p className="text-[13px] text-[#545454] line-clamp-2 mt-0.5">
+                            {article.description}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[14px] text-[#999] text-center py-8">
+                  No articles found. Try asking the AI assistant instead.
+                </p>
+              )}
             </div>
           )}
 
@@ -286,7 +382,7 @@ export function FigmaHomepage() {
           )}
 
           {/* Conversational input bar — always visible */}
-          <div className={`${conversationActive ? "pb-6" : "pb-20"} relative max-w-[540px] mx-auto`}>
+          <div className={`${conversationActive ? "pb-6" : "pb-8"} relative max-w-[540px] mx-auto`}>
             <div className="relative">
               {conversationActive ? (
                 <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-[#5551FF]" />
@@ -299,23 +395,64 @@ export function FigmaHomepage() {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={conversationActive ? "Follow up..." : `Ask ${config.content.assistantName} anything...`}
-                className="w-full h-[52px] pl-12 pr-14 rounded-xl border border-[#e5e5e5] bg-white text-[15px] text-black placeholder:text-[#999] focus:outline-none focus:border-[#5551FF] focus:ring-2 focus:ring-[#5551FF]/15 transition-all shadow-sm"
+                className="w-full h-[52px] pl-12 pr-24 rounded-xl border border-[#e5e5e5] bg-white text-[15px] text-black placeholder:text-[#999] focus:outline-none focus:border-[#5551FF] focus:ring-2 focus:ring-[#5551FF]/15 transition-all shadow-sm"
               />
-              <button
-                onClick={handleSend}
-                disabled={!query.trim()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-lg bg-[#5551FF] text-white disabled:opacity-30 hover:bg-[#4440E6] transition-colors cursor-pointer disabled:cursor-default"
-                aria-label="Send message"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {/* Search button — searches KB articles */}
+                {!conversationActive && (
+                  <button
+                    onClick={() => handleSearch(query)}
+                    disabled={!query.trim()}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-[#999] hover:text-[#5551FF] hover:bg-[#5551FF]/5 disabled:opacity-30 transition-colors cursor-pointer disabled:cursor-default"
+                    aria-label="Search articles"
+                    title="Search articles"
+                  >
+                    <Search className="h-4 w-4" />
+                  </button>
+                )}
+                {/* Send button — starts AI conversation */}
+                <button
+                  onClick={handleSend}
+                  disabled={!query.trim()}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#5551FF] text-white disabled:opacity-30 hover:bg-[#4440E6] transition-colors cursor-pointer disabled:cursor-default"
+                  aria-label="Ask AI"
+                  title="Ask AI"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            {!conversationActive && (
+            {!conversationActive && !searchActive && (
               <p className="text-center text-[12px] text-[#999] mt-3">
-                Powered by AI &middot; Or browse topics below
+                <Search className="inline h-3 w-3 mr-1" />Search articles or <Sparkles className="inline h-3 w-3 mx-0.5" />ask AI
               </p>
             )}
           </div>
+
+          {/* Personalized action cards (SDK: assembleBlocks) */}
+          {!conversationActive && !searchActive && personalization && personalization.actionCards.length > 0 && (
+            <div className="max-w-[540px] mx-auto pb-12">
+              <div className="grid grid-cols-2 gap-2">
+                {personalization.actionCards.map((card, i) => (
+                  <button
+                    key={i}
+                    onClick={() => startConversation(`${card.title}: ${card.subtitle}`)}
+                    className="group flex items-start gap-3 rounded-lg border border-[#e5e5e5] p-3 hover:border-[#5551FF]/30 hover:shadow-sm transition-all text-left cursor-pointer"
+                  >
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-md shrink-0 ${CARD_COLORS[i % CARD_COLORS.length].bg} ${CARD_COLORS[i % CARD_COLORS.length].text}`}>
+                      {ICON_POOL[i % ICON_POOL.length]}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-[13px] font-semibold text-black group-hover:text-[#5551FF] transition-colors line-clamp-1">
+                        {card.title}
+                      </h4>
+                      <p className="text-[12px] text-[#999] line-clamp-1">{card.subtitle}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
