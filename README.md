@@ -69,46 +69,7 @@ src/
 
 ## Build Your Own Portal
 
-### Option A: Customize the reference portal
-
-Edit the config preset to match your brand:
-
-```typescript
-// src/portal/config/presets/my-company.ts
-import type { PortalConfig } from "../types";
-
-export const MY_CONFIG: Partial<PortalConfig> = {
-  branding: {
-    orgName: "Acme Corp",
-    accentColor: "220 90% 56%",  // HSL
-    theme: "light",
-  },
-  content: {
-    welcomeHeadline: "How can we help?",
-    assistantName: "Aria",
-    portalTitle: "Acme Support",
-  },
-  features: {
-    ticketCreation: true,
-    search: true,
-    aiSummary: true,
-  },
-};
-```
-
-Register it in `src/app/[locale]/[portalSlug]/layout.tsx`:
-
-```typescript
-import { MY_CONFIG } from "@/portal/config/presets/my-company";
-
-const PRESET_MAP = {
-  "my-portal": MY_CONFIG,
-};
-```
-
-### Option B: Build a completely custom UI
-
-Keep the SDK, replace everything else. Use hooks to pull data:
+Keep the SDK, build your own UI. Use hooks to pull data:
 
 ```tsx
 import { useSession } from '@/devrev-sdk/hooks/use-session'
