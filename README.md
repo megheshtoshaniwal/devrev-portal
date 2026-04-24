@@ -31,7 +31,7 @@ DEVREV_PORTAL_SLUG=my-portal
 **Where to get these:**
 - **AAT** — DevRev Settings > Tokens > Application Access Token
 - **PAT** — DevRev Settings > Tokens > Personal Access Token
-- **Org ID** — Your DevRev org URL contains it (e.g., `DEV-xxxxx`)
+- **Org ID** — Without the `DEV-` prefix (e.g., `1JpSJovlTT`)
 
 For Auth0 SSO (optional):
 ```
