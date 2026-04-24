@@ -18,22 +18,25 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with your DevRev credentials:
+Edit `.env.local` — only 4 variables required:
 
 ```
 DEVREV_API_BASE=https://api.devrev.ai
 DEVREV_AAT=<your-application-access-token>
 DEVREV_PAT=<your-personal-access-token>
 DEVREV_DEV_ORG_ID=<your-org-id>
-DEVREV_PORTAL_SLUG=my-portal
 ```
 
-**Where to get these:**
-- **AAT** — DevRev Settings > Tokens > Application Access Token
-- **PAT** — DevRev Settings > Tokens > Personal Access Token
-- **Org ID** — Without the `DEV-` prefix (e.g., `1JpSJovlTT`)
+| Variable | What it does | Where to find it |
+|----------|-------------|-----------------|
+| `DEVREV_API_BASE` | API gateway URL | `https://api.devrev.ai` for production |
+| `DEVREV_AAT` | Creates anonymous user sessions | DevRev Settings > Tokens > Application Access Token |
+| `DEVREV_PAT` | Powers AI features, schema access, admin operations | DevRev Settings > Tokens > Personal Access Token |
+| `DEVREV_DEV_ORG_ID` | Your org identifier | Without the `DEV-` prefix (e.g., `1JpSJovlTT`) |
 
-For Auth0 SSO (optional):
+That's it. These 4 variables power **everything** — data fetching, auth, AI personalization, ticket creation, search. No other config is needed to get started.
+
+For Auth0 SSO (optional — only if you need authenticated login):
 ```
 NEXT_PUBLIC_AUTH0_DOMAIN=<your-auth0-domain>
 NEXT_PUBLIC_AUTH0_CLIENT_ID=<your-client-id>
@@ -175,15 +178,36 @@ const myAdapter: AuthAdapter = {
 
 ### AI
 
-```typescript
-useAIContext()  → { contextPrefix }  // Ambient context for LLM calls
+All AI is powered by your `DEVREV_PAT` — no extra config, no artifacts, no setup. Just call the hooks:
 
-// Personalization engine
+```typescript
+// Conversational AI — ask anything
+const { apiCall } = useDevRevAPI()
+const response = await apiCall("POST", "internal/recommendations.chat.completions", {
+  messages: [
+    { role: "system", content: "You are Acme's support assistant..." },
+    { role: "user", content: "How do I reset my password?" },
+  ],
+  temperature: 0.3,
+})
+// response.text_response → AI answer
+
+// Personalization — AI-generated homepage
 assembleBlocks(
   { user, tickets, conversations, directories },
   apiCall,
-  personalizationConfig
+  {
+    systemPrompt: "Your product-specific instructions...",
+    contextSignals: ["user_identity", "tickets", "conversations", "kb_directories"],
+    temperature: 0.3,
+    maxTokens: 600,
+    actionCardCount: 4,
+    suggestionCount: 3,
+  }
 ) → { greeting, actionCards, sidebarBlocks }
+
+// Ambient context — auto-injected into LLM calls
+useAIContext() → { contextPrefix }
 ```
 
 ### Schema & Forms
