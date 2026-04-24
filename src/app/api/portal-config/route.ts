@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const API_BASE = process.env.DEVREV_API_BASE || "";
+const API_BASE = process.env.DEVREV_API_BASE || "https://api.devrev.ai";
 
 // GET /api/portal-config — fetch portal preferences (branding, features)
 export async function GET() {
