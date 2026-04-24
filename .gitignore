@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local files
+Screenshot*
+figma-exports/
+*.plan.md
+*-progress.md
