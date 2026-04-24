@@ -1,36 +1,252 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DevRev AI Customer Portal
 
-## Getting Started
+Build a fully customizable, AI-native help center powered by DevRev.
 
-First, run the development server:
+## Quick Start
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/megheshtoshaniwal/devrev-portal.git
+cd devrev-portal
+npm install
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your DevRev credentials:
+
+```
+DEVREV_API_BASE=https://api.devrev.ai
+DEVREV_AAT=<your-application-access-token>
+DEVREV_PAT=<your-personal-access-token>
+DEVREV_DEV_ORG_ID=<your-org-id>
+DEVREV_PORTAL_SLUG=my-portal
+```
+
+**Where to get these:**
+- **AAT** — DevRev Settings > Tokens > Application Access Token
+- **PAT** — DevRev Settings > Tokens > Personal Access Token
+- **Org ID** — Your DevRev org URL contains it (e.g., `DEV-xxxxx`)
+
+For Auth0 SSO (optional):
+```
+NEXT_PUBLIC_AUTH0_DOMAIN=<your-auth0-domain>
+NEXT_PUBLIC_AUTH0_CLIENT_ID=<your-client-id>
+NEXT_PUBLIC_REV_AUTH0_ORG_ID=<your-org-id>
+```
+
+### 3. Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000/en-US/my-portal`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
 
-## Learn More
+```
+src/
+  devrev-sdk/     ← DevRev's SDK. Data, auth, AI. Don't modify.
+  portal/         ← Config layer. Presets, theming, defaults.
+  components/     ← UI components. Replace with your own.
+  app/            ← Pages and routing. Build any layout.
+```
 
-To learn more about Next.js, take a look at the following resources:
+**The rule:** `devrev-sdk/` is a black box. Everything else is yours.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Build Your Own Portal
 
-## Deploy on Vercel
+### Option A: Customize the reference portal
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Edit the config preset to match your brand:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```typescript
+// src/portal/config/presets/my-company.ts
+import type { PortalConfig } from "../types";
+
+export const MY_CONFIG: Partial<PortalConfig> = {
+  branding: {
+    orgName: "Acme Corp",
+    accentColor: "220 90% 56%",  // HSL
+    theme: "light",
+  },
+  content: {
+    welcomeHeadline: "How can we help?",
+    assistantName: "Aria",
+    portalTitle: "Acme Support",
+  },
+  features: {
+    ticketCreation: true,
+    search: true,
+    aiSummary: true,
+  },
+};
+```
+
+Register it in `src/app/[locale]/[portalSlug]/layout.tsx`:
+
+```typescript
+import { MY_CONFIG } from "@/portal/config/presets/my-company";
+
+const PRESET_MAP = {
+  "my-portal": MY_CONFIG,
+};
+```
+
+### Option B: Build a completely custom UI
+
+Keep the SDK, replace everything else. Use hooks to pull data:
+
+```tsx
+import { useSession } from '@/devrev-sdk/hooks/use-session'
+import { useTickets } from '@/devrev-sdk/data/use-tickets'
+import { useDirectories } from '@/devrev-sdk/data/use-directories'
+import { useConversations } from '@/devrev-sdk/data/use-conversations'
+import { useDevRevAPI } from '@/devrev-sdk/hooks/use-devrev'
+
+function MyHelpCenter() {
+  const { user, isAuthenticated, login, logout } = useSession()
+  const { tickets } = useTickets({ limit: 10 })
+  const { directories } = useDirectories()
+  const { conversations } = useConversations({ limit: 5 })
+  const { apiCall } = useDevRevAPI()
+
+  // Build whatever UI you want
+}
+```
+
+See `src/components/figma/` for a complete example — a Figma-style help center built entirely with SDK hooks.
+
+---
+
+## SDK Reference
+
+### Data Hooks
+
+```typescript
+useTickets({ limit })        → { tickets: Ticket[], loading }
+useTicket(displayId)         → { ticket, timeline, loading }
+useConversations({ limit })  → { conversations: Conversation[], loading }
+useDirectories()             → { directories: DirectoryNode[], loading }
+useDirectoryArticles(id)     → { articles: Article[], loading }
+```
+
+### Auth
+
+```typescript
+useSession()  → { user, token, isAuthenticated, login, logout, loading }
+
+// Wrap your app with DevRevProvider
+<DevRevProvider
+  initialToken={token}
+  initialUser={user}
+  brandContext={{ orgName: "Acme", assistantName: "Aria" }}
+  authAdapter={createAuth0Adapter()}  // or your own AuthAdapter
+>
+  {children}
+</DevRevProvider>
+```
+
+### Custom SSO
+
+Implement the `AuthAdapter` interface to use any identity provider:
+
+```typescript
+import type { AuthAdapter } from '@/devrev-sdk/auth/auth-adapter'
+
+const myAdapter: AuthAdapter = {
+  name: "MySSO",
+  async login() { /* redirect to your SSO */ },
+  async logout() { /* clear session */ },
+  async getIdentityToken() { /* return JWT */ },
+  onTokenChange(cb) { /* subscribe to token changes */ return () => {} },
+}
+```
+
+### AI
+
+```typescript
+useAIContext()  → { contextPrefix }  // Ambient context for LLM calls
+
+// Personalization engine
+assembleBlocks(
+  { user, tickets, conversations, directories },
+  apiCall,
+  personalizationConfig
+) → { greeting, actionCards, sidebarBlocks }
+```
+
+### Schema & Forms
+
+```typescript
+useTicketSubtypes()         → { subtypes: Subtype[], loading }
+useTicketSchema(subtype)    → { schema: AggregatedSchema, loading }
+useTicketForm(schema, acl)  → { entity, formFields, updateField, isValid }
+```
+
+### Articles
+
+```typescript
+fetchArticleContent(article)   → ArticleContent (Tiptap JSON / Paligo HTML / plain text)
+extractTocFromTiptap(doc)      → TOCItem[]
+```
+
+---
+
+## Portal Config
+
+All configuration is driven by `PortalConfig`. Three resolution layers:
+
+```
+Defaults  ←  Portal Preferences API  ←  Extended Config Artifact
+```
+
+### Configurable areas
+
+| Area | What you control |
+|------|-----------------|
+| **Branding** | Org name, logo, accent color, theme, border radius, font |
+| **Content** | Headlines, search placeholder, assistant name/icon, labels |
+| **AI** | Personalization prompt, context signals, temperature, deflection |
+| **Ticket Creation** | AI assist, deflection, status page, journey context |
+| **Features** | Toggle: tickets, search, AI summary, voting, public access, SEO |
+| **Layout** | Sidebar position, columns, hero, TOC, max width |
+| **Styles** | Card style, button style, hero gradient, 8 color tokens |
+| **Navigation** | Header nav items, footer links, social links |
+
+---
+
+## Deployment
+
+Standard Next.js deployment. Works with:
+
+- **Vercel** — `vercel deploy`
+- **AWS** — via Docker or serverless
+- **Self-hosted** — `npm run build && npm start`
+
+---
+
+## Examples
+
+- **Default portal** — `src/portal/config/presets/bill.ts` (Bill.com themed)
+- **Figma portal** — `src/components/figma/` (complete Figma-style help center)
+- **Product overview** — `AI-CUSTOMER-PORTAL-PRD.md`
+
+---
+
+## Testing
+
+```bash
+npm test          # Run all 105 tests
+npm run test:watch  # Watch mode
+```
