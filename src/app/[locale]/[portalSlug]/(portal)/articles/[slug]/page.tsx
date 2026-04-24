@@ -36,6 +36,46 @@ interface PageProps {
   params: Promise<{ locale: string; portalSlug: string; slug: string }>;
 }
 
+// ─── SEO Metadata ──────────────────────────────────────────────
+
+export async function generateMetadata({ params }: PageProps): Promise<import("next").Metadata> {
+  const { locale, portalSlug, slug } = await params;
+  const token = await getSessionToken();
+  const pat = process.env.DEVREV_PAT;
+  const fetchToken = token || (pat ? `Bearer ${pat}` : "");
+  if (!fetchToken) return {};
+
+  const article = await getArticle(fetchToken, slug);
+  if (!article) return {};
+
+  const title = article.title;
+  const description = article.description || `Read ${article.title}`;
+  const url = `/${locale}/${portalSlug}/articles/${slug}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      url,
+      publishedTime: article.created_date,
+      modifiedTime: article.modified_date,
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+    alternates: {
+      canonical: url,
+    },
+  };
+}
+
+// ─── Page ──────────────────────────────────────────────────────
+
 export default async function ArticlePage({ params }: PageProps) {
   const { locale, portalSlug, slug } = await params;
   const basePath = `/${locale}/${portalSlug}`;
@@ -150,6 +190,29 @@ export default async function ArticlePage({ params }: PageProps) {
           {article.title}
         </span>
       </nav>
+
+      {/* JSON-LD structured data for search engines */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Article",
+            headline: article.title,
+            description: article.description || "",
+            datePublished: article.created_date,
+            dateModified: article.modified_date,
+            author: {
+              "@type": "Organization",
+              name: config.branding.orgName,
+            },
+            publisher: {
+              "@type": "Organization",
+              name: config.branding.orgName,
+            },
+          }),
+        }}
+      />
 
       <div className="flex gap-8">
         {/* Main content — server-rendered */}

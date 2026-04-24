@@ -39,9 +39,30 @@ export async function generateMetadata({
   const preset = PRESET_MAP[portalSlug];
   const config = await getPortalConfig(portalSlug, preset);
 
+  const title = `${config.branding.orgName} ${config.content.portalTitle}`;
+  const description = config.content.welcomeSubtext
+    || `Get help with ${config.branding.orgName} — browse articles, create tickets, and chat with AI.`;
+
   return {
-    title: `${config.branding.orgName} ${config.content.portalTitle}`,
-    description: `Get help with ${config.branding.orgName}`,
+    title: {
+      default: title,
+      template: `%s | ${title}`,
+    },
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      siteName: title,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+    robots: config.features.seo
+      ? { index: true, follow: true }
+      : { index: false, follow: false },
   };
 }
 

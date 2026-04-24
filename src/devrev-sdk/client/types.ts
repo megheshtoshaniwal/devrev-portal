@@ -65,6 +65,8 @@ export interface Article {
   tags?: TagRef[];
   rank?: string;
   resource?: { url?: string; artifacts?: ArtifactRef[] };
+  created_date?: string;
+  modified_date?: string;
 }
 
 export interface Ticket {
