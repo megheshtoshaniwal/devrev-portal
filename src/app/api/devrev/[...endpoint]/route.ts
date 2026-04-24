@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.DEVREV_API_BASE || "https://api.dev.devrev-eng.ai";
+const API_BASE = process.env.DEVREV_API_BASE || "";
 
 // For LLM calls, the API returns SSE format even with stream:false.
 // We need to use the PAT for LLM endpoints since rev user tokens may not have access.

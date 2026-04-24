@@ -12,7 +12,7 @@ import type {
 } from "../client/types";
 import type { ArticleContent } from "../articles/fetch-content";
 
-const API_BASE = process.env.DEVREV_API_BASE || "https://api.dev.devrev-eng.ai";
+const API_BASE = process.env.DEVREV_API_BASE || "";
 
 // ─── Generic fetcher ───────────────────────────────────────────
 

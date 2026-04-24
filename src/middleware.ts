@@ -3,7 +3,7 @@ import { getTokenFromRequest } from "@/devrev-sdk/auth/session";
 
 // Default portal for the root redirect
 const DEFAULT_LOCALE = "en-US";
-const DEFAULT_SLUG = process.env.DEFAULT_PORTAL_SLUG || "bill-portal-demo";
+const DEFAULT_SLUG = process.env.DEFAULT_PORTAL_SLUG || "my-portal";
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

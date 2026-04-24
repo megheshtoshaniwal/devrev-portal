@@ -13,7 +13,7 @@ import type {
   SearchResult,
 } from "./types";
 
-const API_BASE = process.env.DEVREV_API_BASE || "https://api.dev.devrev-eng.ai";
+const API_BASE = process.env.DEVREV_API_BASE || "";
 
 interface RequestOptions {
   token: string;

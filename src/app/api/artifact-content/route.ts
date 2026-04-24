@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.DEVREV_API_BASE || "https://api.dev.devrev-eng.ai";
+const API_BASE = process.env.DEVREV_API_BASE || "";
 
 /**
  * Server-side proxy for fetching artifact content.

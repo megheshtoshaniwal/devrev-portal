@@ -9,7 +9,7 @@
 import type { PortalConfig, ColorTokens } from "./types";
 import { DEFAULT_CONFIG } from "./defaults";
 
-const API_BASE = process.env.DEVREV_API_BASE || "https://api.dev.devrev-eng.ai";
+const API_BASE = process.env.DEVREV_API_BASE || "";
 
 // ─── In-Memory Cache ───────────────────────────────────────────
 

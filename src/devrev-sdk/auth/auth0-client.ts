@@ -4,10 +4,10 @@ let auth0Client: Auth0Client | null = null;
 
 export function getAuth0Config() {
   return {
-    domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "rev.auth.dev.devrev-eng.ai",
-    clientId: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "3ZLDI8T7hTKQBXpUpeQbhpet4oehkXVQ",
+    domain: process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "",
+    clientId: process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "",
     audience: process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || "janus",
-    revAuth0OrgId: process.env.NEXT_PUBLIC_REV_AUTH0_ORG_ID || "org_5l4dhTw5HZo9tqAv",
+    revAuth0OrgId: process.env.NEXT_PUBLIC_REV_AUTH0_ORG_ID || "",
   };
 }
 
