@@ -154,3 +154,42 @@ export interface TagRef {
   tag: { id: string; name: string };
   value?: string;
 }
+
+// ─── Chat Completions API ──────────────────────────────────────
+
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface JsonSchemaResponseFormat {
+  json_schema: {
+    type: "json_schema";
+    json_schema: {
+      name: string;
+      schema: Record<string, unknown>;
+    };
+  };
+}
+
+export interface ChatCompletionRequest {
+  messages: ChatMessage[];
+  model?: string;
+  model_provider?: string;
+  reasoning_effort?: "low" | "medium" | "high";
+  temperature?: number;
+  max_tokens?: number;
+  stream?: boolean;
+  response_format?: JsonSchemaResponseFormat;
+}
+
+export interface ChatCompletionResponse {
+  /** Structured JSON when response_format is used (parsed from the model output) */
+  choices?: Array<{
+    message?: { role: string; content: string };
+    finish_reason?: string;
+  }>;
+  /** Legacy: plain text when no response_format is set */
+  text_response?: string;
+  completion?: string;
+}

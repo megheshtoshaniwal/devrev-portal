@@ -60,9 +60,20 @@ const res = await fetch(`${API_BASE}/${path}`, {
     );
   }
 
-  // Handle SSE responses (LLM endpoints return "data: {...}" format)
+  // Determine if the upstream responded with SSE
   const contentType = res.headers.get("content-type") || "";
-  if (contentType.includes("text/event-stream") || isLLMEndpoint(path)) {
+  const isSSE = contentType.includes("text/event-stream");
+
+  // For LLM endpoints: if the caller sent stream:false AND the upstream
+  // returned regular JSON (not SSE), pass it through directly.
+  if (isLLMEndpoint(path) && !isSSE) {
+    const data = await res.json().catch(() => ({ error: "Invalid JSON response" }));
+    return NextResponse.json(data, { status: res.status });
+  }
+
+  // Handle SSE responses (LLM endpoints may still return SSE with stream:true
+  // or when the upstream ignores the stream flag)
+  if (isSSE || isLLMEndpoint(path)) {
     const text = await res.text();
     // Parse SSE: extract all "data: " lines and combine
     const dataLines = text

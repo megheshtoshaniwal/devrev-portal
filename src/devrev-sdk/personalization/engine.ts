@@ -8,6 +8,7 @@
 
 import type { Ticket, Conversation, DirectoryNode, RevUser } from "../client/types";
 import type { PersonalizationConfig, ContextSignal } from "./types";
+import { buildJsonSchema } from "../client/api-client";
 
 // SDK-level defaults — matches the portal DEFAULT_CONFIG.personalization values.
 // The portal can override these by passing its own config to assembleBlocks().
@@ -169,6 +170,56 @@ function buildUserContext(
   return parts.join("\n");
 }
 
+// ─── LLM Response Schema ───────────────────────────────────────
+
+const PERSONALIZATION_RESPONSE_FORMAT = buildJsonSchema("homepage_personalization", {
+  type: "object",
+  properties: {
+    greeting: {
+      type: "object",
+      properties: {
+        headline: { type: "string" },
+        subtext: { type: "string" },
+      },
+      required: ["headline", "subtext"],
+      additionalProperties: false,
+    },
+    suggestions: {
+      type: "array",
+      items: { type: "string" },
+    },
+    action_cards: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          subtitle: { type: "string" },
+          icon: {
+            type: "string",
+            enum: ["settings", "shield", "plus", "newspaper", "zap", "book", "alert", "star", "search", "users"],
+          },
+          color: {
+            type: "string",
+            enum: ["violet", "rose", "orange", "sky", "emerald", "amber", "slate"],
+          },
+          badge_text: { type: "string" },
+          badge_variant: { type: "string", enum: ["warning", "success", "info"] },
+          action: { type: "string" },
+        },
+        required: ["title", "subtitle", "icon", "color"],
+        additionalProperties: false,
+      },
+    },
+    blocks: {
+      type: "array",
+      items: { type: "string" },
+    },
+  },
+  required: ["greeting", "suggestions", "action_cards", "blocks"],
+  additionalProperties: false,
+});
+
 // ─── LLM Call ───────────────────────────────────────────────────
 
 async function callLLM(
@@ -191,13 +242,42 @@ async function callLLM(
         ],
         max_tokens: personalizationConfig.maxTokens,
         temperature: personalizationConfig.temperature,
+        stream: false,
+        response_format: PERSONALIZATION_RESPONSE_FORMAT,
       }
-    )) as { text_response?: string; completion?: string };
+    )) as {
+      choices?: Array<{ message?: { content: string } }>;
+      text_response?: string;
+      completion?: string;
+    };
 
-    const jsonStr = response.text_response || response.completion;
+    const jsonStr =
+      response.choices?.[0]?.message?.content ||
+      response.text_response ||
+      response.completion;
     if (!jsonStr) return null;
 
-    return JSON.parse(jsonStr) as LLMPersonalization;
+    const parsed = JSON.parse(jsonStr);
+    // Normalize badge into { text, variant } — the LLM may return:
+    //   badge: "some text"          (string)
+    //   badge: { text, variant }    (correct shape)
+    //   badge_text + badge_variant  (flat fields from strict schema)
+    if (parsed.action_cards) {
+      parsed.action_cards = parsed.action_cards.map(
+        (card: Record<string, unknown>) => {
+          let badge: { text: string; variant: string } | undefined;
+          if (typeof card.badge === "string" && card.badge) {
+            badge = { text: card.badge, variant: "info" };
+          } else if (card.badge && typeof card.badge === "object") {
+            badge = card.badge as { text: string; variant: string };
+          } else if (card.badge_text) {
+            badge = { text: card.badge_text as string, variant: (card.badge_variant as string) || "info" };
+          }
+          return { ...card, badge };
+        }
+      );
+    }
+    return parsed as LLMPersonalization;
   } catch (err) {
     console.error("LLM personalization failed:", err);
     return null;

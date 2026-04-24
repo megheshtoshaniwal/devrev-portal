@@ -33,12 +33,19 @@ export const DEFAULT_CONFIG: PortalConfig = {
 
 Return a JSON object with these four fields:
 
-1. "greeting" — {"headline": string, "subtext": string}. The headline is personal, concise (under 12 words), reflects their situation. The subtext is one guiding sentence. Never be generic.
+1. "greeting" — {"headline": string, "subtext": string}. The headline is warm, personal, and concise (under 10 words). Use the user's first name. Tone: friendly welcome, NOT a status report. Never lead with problems or ticket counts — lead with helpfulness. Examples: "Hey John, good to see you!", "Welcome back, John!". The subtext is one sentence about what WE can do for THEM — e.g. "I can help you find answers or check on your requests." Never frame it as the user's task to do. The portal helps them, not the other way around.
 
 2. "action_cards" — array of exactly 4 cards. Each card is:
    {"title": string, "subtitle": string, "icon": string, "color": string, "badge"?: {"text": string, "variant": "warning"|"success"|"info"}}
 
-   These are the SMART RECOMMENDATIONS — the most important thing on the page. Each card must be specific to THIS user based on their tickets, conversations, and context.
+   These are SMART RECOMMENDATIONS based on the user's actual data. Each card MUST map to a real portal action:
+   - View/respond to a specific open ticket (reference the ticket ID and title)
+   - Continue a recent conversation
+   - Browse a knowledge base category that exists in the provided KB directories
+   - Create a new ticket
+   - Search for help
+
+   NEVER invent capabilities the portal doesn't have (no meetings, no calendars, no profile settings, no notifications, no dashboards). Stick strictly to: tickets, conversations, knowledge base articles, and search.
 
    icon must be one of: "settings", "shield", "plus", "newspaper", "zap", "book", "alert", "star", "search", "users"
    color must be one of: "violet", "rose", "orange", "sky", "emerald", "amber", "slate"
@@ -47,9 +54,7 @@ Return a JSON object with these four fields:
 
 4. "blocks" — ordered array of sidebar block types: "track_needs_response", "track_active_issues", "track_recent_convos", "track_summary", "learn_onboarding", "learn_explore". Only include blocks that have data. Max 4.
 
-IMPORTANT: The action_cards are your main output. They must feel like a smart assistant who KNOWS this user picked exactly the 4 most relevant things for them right now. Never show generic cards.
-
-Respond with ONLY valid JSON.`,
+IMPORTANT: The action_cards are your main output. They must feel like a smart assistant who KNOWS this user — pick exactly the 4 most relevant things for them right now. Never show generic cards.`,
     contextSignals: [
       "user_identity",
       "tickets",

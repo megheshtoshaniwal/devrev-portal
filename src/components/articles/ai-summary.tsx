@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/portal/utils/utils";
+import { buildJsonSchema } from "@/devrev-sdk/client/api-client";
 
 interface AISummary {
   tldr: string;
@@ -30,14 +31,27 @@ interface AISummaryBarProps {
   ) => Promise<T>;
 }
 
-const SUMMARY_PROMPT = `You are a knowledge base assistant. Given an article, produce a JSON object with these fields:
+const SUMMARY_PROMPT = `You are a knowledge base assistant. Given an article, produce a summary with:
+- "tldr": 2-3 sentence summary of what this article covers and when you'd need it. Be specific.
+- "key_steps": If the article is a how-to, extract the main steps (max 6). Otherwise empty array.
+- "audience": Who this is for in 2-4 words (e.g. "Account Admins", "Developers").
+- "read_time_minutes": Estimated read time based on content length and complexity.`;
 
-1. "tldr" — 2-3 sentence summary of what this article covers and when you'd need it. Be specific, not generic.
-2. "key_steps" — If the article is a how-to or guide, extract the main steps as a string array (max 6 steps). If it's not a how-to, set to null.
-3. "audience" — Who this article is for in 2-4 words (e.g., "Account Admins", "All users", "Developers", "Billing managers").
-4. "read_time_minutes" — Estimated read time based on content length and complexity.
-
-Respond with ONLY valid JSON. No markdown, no explanation.`;
+const SUMMARY_RESPONSE_FORMAT = buildJsonSchema("article_summary", {
+  type: "object",
+  properties: {
+    tldr: { type: "string", description: "2-3 sentence summary" },
+    key_steps: {
+      type: "array",
+      items: { type: "string" },
+      description: "Main steps if how-to, otherwise empty array",
+    },
+    audience: { type: "string", description: "Target audience in 2-4 words" },
+    read_time_minutes: { type: "number", description: "Estimated read time" },
+  },
+  required: ["tldr", "key_steps", "audience", "read_time_minutes"],
+  additionalProperties: false,
+});
 
 export function AISummaryBar({
   articleTitle,
@@ -60,7 +74,11 @@ export function AISummaryBar({
     // Truncate to first ~3000 chars to keep token usage reasonable
     const truncated = articleText.slice(0, 3000);
 
-    apiCall<{ text_response?: string; completion?: string }>(
+    apiCall<{
+      choices?: Array<{ message?: { content: string } }>;
+      text_response?: string;
+      completion?: string;
+    }>(
       "POST",
       "internal/recommendations.chat.completions",
       {
@@ -73,17 +91,22 @@ export function AISummaryBar({
         ],
         max_tokens: 400,
         temperature: 0.2,
+        stream: false,
+        response_format: SUMMARY_RESPONSE_FORMAT,
       }
     )
       .then((res) => {
         if (cancelled) return;
-        const jsonStr = res.text_response || res.completion;
+        const jsonStr =
+          res.choices?.[0]?.message?.content ||
+          res.text_response ||
+          res.completion;
         if (!jsonStr) throw new Error("Empty response");
 
         const parsed = JSON.parse(jsonStr);
         setSummary({
           tldr: parsed.tldr,
-          keySteps: parsed.key_steps,
+          keySteps: parsed.key_steps?.length ? parsed.key_steps : null,
           audience: parsed.audience,
           readTimeMinutes: parsed.read_time_minutes || Math.ceil(articleText.split(/\s+/).length / 200),
         });

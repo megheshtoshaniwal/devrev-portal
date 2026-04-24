@@ -11,6 +11,8 @@ import type {
   Conversation,
   TimelineEntry,
   SearchResult,
+  ChatCompletionRequest,
+  JsonSchemaResponseFormat,
 } from "./types";
 
 const API_BASE = process.env.DEVREV_API_BASE || "https://api.devrev.ai";
@@ -287,4 +289,66 @@ export async function locateArtifact(
     opts,
     { id, ...(preview && { preview: "true" }) }
   );
+}
+
+// ─── Chat Completions ──────────────────────────────────────────
+
+/**
+ * Build a response_format object for structured JSON output.
+ * Pass the result as `response_format` in a ChatCompletionRequest.
+ *
+ * @param name   — identifier for the schema (e.g. "article_summary")
+ * @param schema — JSON Schema object describing the expected shape
+ */
+export function buildJsonSchema(
+  name: string,
+  schema: Record<string, unknown>
+): JsonSchemaResponseFormat {
+  return {
+    json_schema: {
+      type: "json_schema",
+      json_schema: { name, schema },
+    },
+  };
+}
+
+/**
+ * Call the DevRev chat completions endpoint.
+ * Returns the parsed content string from the first choice.
+ *
+ * When `response_format` is set, the returned string is guaranteed valid JSON
+ * matching the schema — call JSON.parse() on it directly.
+ */
+export async function chatCompletion(
+  opts: RequestOptions,
+  req: ChatCompletionRequest
+): Promise<string> {
+  // We always request non-streaming from the server proxy.
+  // The proxy handles SSE unwrapping when the upstream streams.
+  const body: Record<string, unknown> = {
+    messages: req.messages,
+    stream: req.stream ?? false,
+    ...(req.model && { model: req.model }),
+    ...(req.model_provider && { model_provider: req.model_provider }),
+    ...(req.reasoning_effort && { reasoning_effort: req.reasoning_effort }),
+    ...(req.temperature !== undefined && { temperature: req.temperature }),
+    ...(req.max_tokens !== undefined && { max_tokens: req.max_tokens }),
+    ...(req.response_format && { response_format: req.response_format }),
+  };
+
+  const res = await apiCall<{
+    choices?: Array<{ message?: { content: string } }>;
+    text_response?: string;
+    completion?: string;
+  }>("POST", "internal/recommendations.chat.completions", opts, body);
+
+  // Structured output → choices[0].message.content
+  if (res.choices?.[0]?.message?.content) {
+    return res.choices[0].message.content;
+  }
+  // Legacy fallback
+  if (res.text_response) return res.text_response;
+  if (res.completion) return res.completion;
+
+  throw new Error("Empty chat completion response");
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Ticket, ArrowRight, Sparkles } from "lucide-react";
 import type { Ticket as TicketType } from "@/devrev-sdk/client";
+import { buildJsonSchema } from "@/devrev-sdk/client/api-client";
 
 interface RelatedTicketBannerProps {
   articleTitle: string;
@@ -29,10 +30,23 @@ const MATCH_PROMPT = `You match support articles to a user's open tickets. Given
 Rules:
 - Only match if the article clearly helps with the ticket's problem
 - Return at most 1 match (the strongest one)
-- If no ticket is relevant, return {"match": null}
-- If there is a match, return {"match": {"ticket_id": "...", "reason": "one sentence why this article helps"}}
+- If no ticket is relevant, set match fields to empty strings`;
 
-Respond with ONLY valid JSON.`;
+const MATCH_RESPONSE_FORMAT = buildJsonSchema("ticket_match", {
+  type: "object",
+  properties: {
+    ticket_id: {
+      type: "string",
+      description: "The display_id of the matched ticket, or empty string if no match",
+    },
+    reason: {
+      type: "string",
+      description: "One sentence why this article helps, or empty string if no match",
+    },
+  },
+  required: ["ticket_id", "reason"],
+  additionalProperties: false,
+});
 
 export function RelatedTicketBanner({
   articleTitle,
@@ -65,7 +79,11 @@ export function RelatedTicketBanner({
       )
       .join("\n");
 
-    apiCall<{ text_response?: string; completion?: string }>(
+    apiCall<{
+      choices?: Array<{ message?: { content: string } }>;
+      text_response?: string;
+      completion?: string;
+    }>(
       "POST",
       "internal/recommendations.chat.completions",
       {
@@ -78,23 +96,28 @@ export function RelatedTicketBanner({
         ],
         max_tokens: 150,
         temperature: 0.1,
+        stream: false,
+        response_format: MATCH_RESPONSE_FORMAT,
       }
     )
       .then((res) => {
         if (cancelled) return;
-        const jsonStr = res.text_response || res.completion;
+        const jsonStr =
+          res.choices?.[0]?.message?.content ||
+          res.text_response ||
+          res.completion;
         if (!jsonStr) return;
 
         const parsed = JSON.parse(jsonStr);
-        if (parsed.match?.ticket_id) {
+        if (parsed.ticket_id) {
           const matchedTicket = openTickets.find(
-            (t) => t.display_id === parsed.match.ticket_id
+            (t) => t.display_id === parsed.ticket_id
           );
           if (matchedTicket) {
             setMatch({
               ticketId: matchedTicket.display_id,
               ticketTitle: matchedTicket.title,
-              reason: parsed.match.reason,
+              reason: parsed.reason,
             });
           }
         }
