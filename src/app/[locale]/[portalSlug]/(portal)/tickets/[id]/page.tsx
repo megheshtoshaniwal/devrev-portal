@@ -21,8 +21,16 @@ import { Badge } from "@/components/ui/badge";
 import { useParams } from "next/navigation";
 import { usePortalConfig } from "@/portal/config";
 import { useTicket } from "@/devrev-sdk/data/use-tickets";
+import { useFieldAcl } from "@/devrev-sdk/schema";
+import { useAclFilteredDefinitions } from "@/devrev-sdk/data/use-field-acl-filter";
+import { getNestedValue } from "@/devrev-sdk/data/types";
 import type { Ticket, TimelineEntry } from "@/devrev-sdk/client";
+import type { ColumnDefinition } from "@/devrev-sdk/data/types";
+import { TICKET_COLUMNS } from "@/portal/config/ticket-list-config";
 import { cn } from "@/portal/utils/utils";
+
+// Fields shown in the header (not in sidebar)
+const HEADER_FIELDS = new Set(["display_id", "title", "status"]);
 
 export default function TicketDetailPage() {
   const { basePath } = usePortalConfig();
@@ -31,6 +39,11 @@ export default function TicketDetailPage() {
 
   // Use cached data hook
   const { ticket, timeline, loading, reply: sendReply, setTimeline } = useTicket(ticketDisplayId);
+
+  // ACL-filtered columns — sidebar shows all non-header fields the user can read
+  const { fieldPrivileges } = useFieldAcl();
+  const aclColumns = useAclFilteredDefinitions(TICKET_COLUMNS, fieldPrivileges);
+  const sidebarFields = aclColumns.filter((col) => !HEADER_FIELDS.has(col.key));
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -215,57 +228,18 @@ export default function TicketDetailPage() {
           </div>
         </div>
 
-        {/* Sidebar: Ticket Metadata */}
+        {/* Sidebar: Ticket Metadata — derived from TICKET_COLUMNS config + ACL */}
         <aside className="w-full lg:w-72 shrink-0">
-          <div className="rounded-2xl bg-card border border-border p-5 space-y-5 sticky top-20">
-            <Field label="Status">
-              <Badge variant={ticket.stage?.state?.name === "open" ? "in_progress" : "closed"} className="text-xs">
-                {ticket.state_display_name || "Open"}
-              </Badge>
-            </Field>
-            {ticket.severity && (
-              <Field label="Severity">
-                <Badge variant={ticket.severity as "low"} className="text-xs">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  {ticket.severity}
-                </Badge>
-              </Field>
-            )}
-            {ticket.owned_by && ticket.owned_by.length > 0 && (
-              <Field label="Assigned to">
-                <span className="text-sm text-foreground">
-                  {ticket.owned_by.map((o) => o.display_name).join(", ")}
-                </span>
-              </Field>
-            )}
-            {ticket.reported_by && ticket.reported_by.length > 0 && (
-              <Field label="Reported by">
-                <span className="text-sm text-foreground">
-                  {ticket.reported_by.map((r) => r.display_name).join(", ")}
-                </span>
-              </Field>
-            )}
-            {ticket.created_date && (
-              <Field label="Created">
-                <span className="text-sm text-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-muted-foreground" />
-                  {formatDate(ticket.created_date)}
-                </span>
-              </Field>
-            )}
-            {ticket.modified_date && (
-              <Field label="Last updated">
-                <span className="text-sm text-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-muted-foreground" />
-                  {formatDate(ticket.modified_date)}
-                </span>
-              </Field>
-            )}
-            {ticket.source_channel && (
-              <Field label="Source">
-                <span className="text-sm text-foreground">{ticket.source_channel}</span>
-              </Field>
-            )}
+          <div className="rounded-2xl bg-card border border-border p-5 space-y-4 sticky top-20">
+            {sidebarFields.map((col) => {
+              const raw = getNestedValue(ticket, col.fieldPath);
+              if (raw == null || raw === "" || (Array.isArray(raw) && raw.length === 0)) return null;
+              const formatted = col.format ? col.format(raw, ticket) : null;
+
+              return (
+                <DetailField key={col.key} label={col.label} fieldKey={col.key} raw={raw} formatted={formatted} ticket={ticket} />
+              );
+            })}
           </div>
         </aside>
       </div>
@@ -273,16 +247,65 @@ export default function TicketDetailPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+// ─── Detail sidebar field renderer ─────────────────────────────
+
+function DetailField({
+  label,
+  fieldKey,
+  raw,
+  formatted,
+  ticket,
+}: {
+  label: string;
+  fieldKey: string;
+  raw: unknown;
+  formatted: string | null;
+  ticket: Ticket;
+}) {
+  // Special rendering for known field types
+  const content = (() => {
+    switch (fieldKey) {
+      case "severity":
+        return (
+          <Badge variant={(raw as string) as "low"} className="text-xs">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            {formatted || String(raw)}
+          </Badge>
+        );
+
+      case "needs_response":
+        return raw ? (
+          <Badge variant="waiting_on_customer" className="text-xs">Yes</Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">No</span>
+        );
+
+      case "escalate":
+      case "is_recurring_issue":
+        return raw === true ? (
+          <Badge variant="default" className="text-xs">Yes</Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">No</span>
+        );
+
+      default:
+        // Use formatted value if available, otherwise stringify
+        return (
+          <span className="text-sm text-foreground">
+            {formatted || String(raw)}
+          </span>
+        );
+    }
+  })();
+
   return (
     <div>
       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
         {label}
       </p>
-      {children}
+      {content}
     </div>
   );
 }
 
-// Date formatting imported from shared utils
 import { formatDate } from "@/devrev-sdk/utils/format-date";
