@@ -44,7 +44,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: data.access_token, authenticated: true }),
       }).catch(() => {});
-      router.push(basePath);
+      window.location.href = basePath;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

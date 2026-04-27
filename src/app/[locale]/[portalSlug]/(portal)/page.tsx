@@ -182,7 +182,7 @@ function DefaultPortalHome() {
 
   // ─── Loading state ───────────────────────────────────────────
 
-  if (sessionLoading || !dataReady || !personalizationDone) {
+  if (sessionLoading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] gap-3">
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -245,18 +245,30 @@ function DefaultPortalHome() {
               )}
               style={{ animationDelay: "80ms" }}
             >
-              {actionCards.map((card, i) => (
-                <ActionCard
-                  key={i}
-                  icon={getIcon(card.icon, "w-4.5 h-4.5") || <Zap className="w-4 h-4" />}
-                  iconBg={actionCardColors[card.color] || "bg-primary"}
-                  title={card.title}
-                  subtitle={card.subtitle}
-                  badge={card.badge}
-                  cardStyle={styles.cardStyle}
-                  onClick={() => startConversation(`${card.title}: ${card.subtitle}`)}
-                />
-              ))}
+              {actionCards.length > 0
+                ? actionCards.map((card, i) => (
+                    <ActionCard
+                      key={i}
+                      icon={getIcon(card.icon, "w-4.5 h-4.5") || <Zap className="w-4 h-4" />}
+                      iconBg={actionCardColors[card.color] || "bg-primary"}
+                      title={card.title}
+                      subtitle={card.subtitle}
+                      badge={card.badge}
+                      cardStyle={styles.cardStyle}
+                      onClick={() => startConversation(`${card.title}: ${card.subtitle}`)}
+                    />
+                  ))
+                : Array.from({ length: homepageLayout.actionCardColumns || 3 }).map((_, i) => (
+                    <div key={i} className="rounded-xl border border-border bg-card p-4 animate-pulse">
+                      <div className="flex items-start gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-muted shrink-0" />
+                        <div className="flex-1 space-y-2 pt-1">
+                          <div className="h-3.5 w-3/4 rounded bg-muted" />
+                          <div className="h-3 w-1/2 rounded bg-muted" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
             </div>
           )}
 
