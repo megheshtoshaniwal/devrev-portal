@@ -10,25 +10,37 @@ import type { Ticket, TimelineEntry } from "../client/types";
 
 // ─── useTickets: cached ticket list ────────────────────────────
 
-export function useTickets(opts?: { limit?: number }) {
+export function useTickets(opts?: {
+  limit?: number;
+  /** Server-side filter params to pass to works.list (e.g., owned_by, reported_by) */
+  apiFilters?: Record<string, unknown>;
+}) {
   const { apiCall } = useDevRevAPI();
   const { token } = useSession();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Stable serialization of apiFilters to prevent unnecessary refetches
+  const filterKey = opts?.apiFilters
+    ? JSON.stringify(opts.apiFilters)
+    : "";
+
   const fetch = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
 
+    const apiFilters = filterKey ? JSON.parse(filterKey) : {};
+
     try {
       const data = await cachedFetch(
-        `tickets:list`,
+        `tickets:list${filterKey ? `:${filterKey}` : ""}`,
         () =>
           apiCall<{ works: Ticket[] }>("POST", "internal/works.list", {
             type: ["ticket"],
             limit: opts?.limit || 50,
+            ...apiFilters,
           }),
         { staleMs: 30_000, expireMs: 120_000 }
       );
@@ -38,7 +50,7 @@ export function useTickets(opts?: { limit?: number }) {
     } finally {
       setLoading(false);
     }
-  }, [token, apiCall, opts?.limit]);
+  }, [token, apiCall, opts?.limit, filterKey]);
 
   useEffect(() => {
     fetch();

@@ -36,8 +36,11 @@ export async function POST(
     return NextResponse.json({ error: "No authorization token" }, { status: 401 });
   }
 
-  // LLM and schema endpoints need the PAT (dev user token), not the rev user token
-  if (needsPAT(path) && process.env.DEVREV_PAT) {
+  // LLM endpoints need the service account token (user PAT returns 403 on chat.completions)
+  // Schema endpoints still use the admin PAT
+  if (isLLMEndpoint(path) && process.env.DEVREV_SVC_TOKEN) {
+    token = `Bearer ${process.env.DEVREV_SVC_TOKEN}`;
+  } else if (needsPAT(path) && process.env.DEVREV_PAT) {
     token = `Bearer ${process.env.DEVREV_PAT}`;
   }
 
