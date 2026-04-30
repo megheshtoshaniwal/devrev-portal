@@ -20,9 +20,15 @@ import { ClientProviders } from "./client-providers";
 // Preset map — in production, this would be a dynamic import based on slug
 import { BILL_CONFIG } from "@/portal/config/presets/bill";
 import { FIGMA_CONFIG } from "@/portal/config/presets/figma";
+import { AXI_CONFIG } from "@/portal/config/presets/axi";
+import { MAPLE_CONFIG } from "@/portal/config/presets/maple";
 const PRESET_MAP: Record<string, typeof BILL_CONFIG> = {
   "bill-portal-demo": BILL_CONFIG,
   "figma-help-center": FIGMA_CONFIG,
+  "figma": FIGMA_CONFIG,
+  "help": FIGMA_CONFIG,
+  "axi": AXI_CONFIG,
+  "maple": MAPLE_CONFIG,
 };
 
 interface LayoutProps {

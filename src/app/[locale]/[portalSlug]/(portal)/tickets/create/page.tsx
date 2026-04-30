@@ -86,33 +86,119 @@ export default function CreateTicketPage() {
     }
   }, [subtypes, selectedSubtype]);
 
-  // Re-apply pending AI field suggestions when schema finishes loading
+  // When schema finishes loading after AI-suggested subtype, extract field values
+  // from the original description via a second focused LLM call.
+  const fieldExtractionAttempted = useRef<string | null>(null);
   useEffect(() => {
     const pending = pendingAiFieldsRef.current;
-    if (!pending || schemaLoading || formFields.length === 0) return;
 
-    // Only apply if the subtype hasn't changed since AI suggested these fields
-    if (pending.subtype !== selectedSubtype) {
-      pendingAiFieldsRef.current = null;
-      return;
-    }
+    // First: re-apply any fields the LLM already suggested
+    if (pending && !schemaLoading && formFields.length > 0) {
+      if (pending.subtype !== selectedSubtype) {
+        pendingAiFieldsRef.current = null;
+        return;
+      }
 
-    setEntity((prev) => {
-      const next = { ...prev };
-      for (const [key, value] of Object.entries(pending.fields)) {
-        if (value !== null && value !== undefined && value !== "") {
-          const matchingField = formFields.find(
-            (f) => f.name === key || f.name === `tnt__${key}` || f.name.replace("tnt__", "") === key
-          );
-          if (matchingField) {
-            next[matchingField.name] = value;
+      setEntity((prev) => {
+        const next = { ...prev };
+        for (const [key, value] of Object.entries(pending.fields)) {
+          if (value !== null && value !== undefined && value !== "") {
+            const matchingField = formFields.find(
+              (f) => f.name === key || f.name === `tnt__${key}` || f.name.replace("tnt__", "") === key
+            );
+            if (matchingField) {
+              next[matchingField.name] = value;
+            }
           }
         }
+        return next;
+      });
+      pendingAiFieldsRef.current = null;
+    }
+
+    // Second: if schema just loaded with new fields and the original description
+    // has content, run a focused extraction call so the LLM can fill fields
+    // it didn't know about during the first call.
+    if (
+      schemaLoading ||
+      formFields.length === 0 ||
+      !description.trim() ||
+      !token ||
+      !tcConfig.aiAssist
+    ) return;
+
+    // Only run once per subtype
+    const extractionKey = `${selectedSubtype}:${formFields.length}`;
+    if (fieldExtractionAttempted.current === extractionKey) return;
+    fieldExtractionAttempted.current = extractionKey;
+
+    const fieldCtx = formFields.map((f) => {
+      const display = f.ui?.displayName || f.displayName || f.name;
+      const type = f.fieldType;
+      const req = (f.conditionOverrides?.isRequired ?? f.isRequired) ? " (REQUIRED)" : "";
+      let vals = "";
+      if ("allowedValues" in f && Array.isArray(f.allowedValues)) {
+        const av = f.allowedValues as (string | { label: string; id: number | string })[];
+        vals = ` allowed_values=[${av.map((v) => typeof v === "string" ? v : v.label).join(", ")}]`;
       }
-      return next;
+      return `- ${f.name}: ${type}${req} — "${display}"${vals}`;
+    }).join("\n");
+
+    // Check if any fields are still empty — skip extraction if everything is filled
+    const emptyFields = formFields.filter((f) => {
+      const val = entity[f.name];
+      return val === undefined || val === null || val === "";
     });
-    pendingAiFieldsRef.current = null;
-  }, [formFields, schemaLoading, selectedSubtype, setEntity]);
+    if (emptyFields.length === 0) return;
+
+    (async () => {
+      try {
+        const res = await apiCall<{ text_response?: string; completion?: string }>(
+          "POST",
+          "internal/recommendations.chat.completions",
+          {
+            messages: [
+              {
+                role: "system",
+                content: `You are a field extraction assistant. Given a user's problem description and a list of form fields, extract values from the description that match the fields. Return ONLY a JSON object mapping field names to extracted values. If a field cannot be determined from the description, omit it. For numeric fields, extract just the number. For enum fields, pick the closest allowed value.`,
+              },
+              {
+                role: "user",
+                content: `Problem description: ${description}\n\nTitle: ${title}\n\nAvailable form fields:\n${fieldCtx}\n\nReturn JSON mapping field names to extracted values.`,
+              },
+            ],
+            max_tokens: 300,
+            temperature: 0.1,
+          }
+        );
+
+        const jsonStr = res.text_response || res.completion;
+        if (!jsonStr) return;
+        const extracted = JSON.parse(jsonStr);
+        if (typeof extracted !== "object") return;
+
+        setEntity((prev) => {
+          const next = { ...prev };
+          for (const [key, value] of Object.entries(extracted)) {
+            if (value === null || value === undefined || value === "") continue;
+            // Only fill fields that are currently empty
+            const matchingField = formFields.find(
+              (f) => f.name === key || f.name === `tnt__${key}` || f.name.replace("tnt__", "") === key
+            );
+            if (matchingField) {
+              const current = next[matchingField.name];
+              if (current === undefined || current === null || current === "") {
+                next[matchingField.name] = value;
+              }
+            }
+          }
+          return next;
+        });
+      } catch {
+        // Silent — field extraction is best-effort
+      }
+    })();
+  }, [formFields, schemaLoading, selectedSubtype, setEntity, description, title, token, apiCall, tcConfig.aiAssist, entity]);
 
   // ─── Step 1: Describe problem ─────────────────────────────────
 
@@ -512,8 +598,8 @@ export default function CreateTicketPage() {
                     className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 appearance-none cursor-pointer"
                   >
                     <option value="">Select a type...</option>
-                    {subtypes.map((s) => (
-                      <option key={s.name} value={s.name}>
+                    {subtypes.map((s, i) => (
+                      <option key={`${s.name}-${i}`} value={s.name}>
                         {s.label}
                       </option>
                     ))}

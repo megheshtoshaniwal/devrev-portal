@@ -26,14 +26,21 @@ import { Sidebar } from "@/components/home/sidebar";
 import { FeedTab } from "@/components/home/feed-tab";
 import { KnowledgeTab } from "@/components/home/knowledge-tab";
 
-// Figma preset
+// Custom presets
 import { FigmaHomepage } from "@/components/figma/figma-homepage";
+import { AxiHomepage } from "@/components/axi/axi-homepage";
+import { MapleHomepage } from "@/components/maple/maple-homepage";
+
+const CUSTOM_HOMEPAGES: Record<string, React.ComponentType> = {
+  "Figma": FigmaHomepage,
+  "Axi": AxiHomepage,
+  "Maple Software": MapleHomepage,
+};
 
 export default function PortalHome() {
   const { config: preCheckConfig } = usePortalConfig();
-  if (preCheckConfig.branding.orgName === "Figma") {
-    return <FigmaHomepage />;
-  }
+  const CustomHome = CUSTOM_HOMEPAGES[preCheckConfig.branding.orgName];
+  if (CustomHome) return <CustomHome />;
   return <DefaultPortalHome />;
 }
 

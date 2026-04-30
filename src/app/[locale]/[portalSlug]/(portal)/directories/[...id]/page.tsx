@@ -8,11 +8,14 @@ import { getSessionToken } from "@/devrev-sdk/auth/session";
 export const revalidate = 300; // 5min ISR
 
 interface PageProps {
-  params: Promise<{ locale: string; portalSlug: string; id: string }>;
+  params: Promise<{ locale: string; portalSlug: string; id: string[] }>;
 }
 
 export default async function DirectoryDetailPage({ params }: PageProps) {
-  const { locale, portalSlug, id: dirId } = await params;
+  const { locale, portalSlug, id: idSegments } = await params;
+  // DON IDs contain slashes (don:core:dvrv-us-1:devo/X:directory/Y)
+  // The catch-all route splits them into segments — rejoin here
+  const dirId = idSegments.join("/");
   const basePath = `/${locale}/${portalSlug}`;
 
   const token = await getSessionToken();

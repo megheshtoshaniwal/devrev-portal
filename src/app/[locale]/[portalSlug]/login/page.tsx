@@ -56,12 +56,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-bold mb-4">
-            BILL
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L9.5 8.5L3 9.5L7.5 14L6.5 21L12 17.5L17.5 21L16.5 14L21 9.5L14.5 8.5L12 2Z" fill="currentColor" /></svg>
           </div>
-          <h1 className="text-xl font-bold text-foreground">BILL Help Center</h1>
+          <h1 className="text-xl font-bold text-foreground">Sign in</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Sign in to access your support portal
+            Access your support portal
           </p>
         </div>
 
